@@ -35,6 +35,8 @@ python main.py
 
 # License
 
+[CC0](https://github.com/OwOBots/bluebot/blob/main/LICENSE)
+
 # Credits
 
 - [BlueSky](https://bsky.app)
