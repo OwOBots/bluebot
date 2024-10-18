@@ -124,7 +124,8 @@ def main():
                 if not duplicate_check(post_id):
                     image_data = requests.get(image_url).content
                     # TODO: add ocr
-                    client.send_image(text=submission.title + " (u/" + submission.author.name + ")" + submission.url,
+                    client.send_image(
+                        text=submission.title + " (u/" + submission.author.name + ")" + "  " + submission.url,
                                       image=image_data,
                                       image_alt='')
                     with open('posted_images.csv', 'a') as csvfile:
