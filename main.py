@@ -13,6 +13,8 @@ import dotenv
 import praw
 import prawcore
 import requests
+from atproto import models
+from atproto_client.models import ids
 
 # this is dumb
 LOG = logging.getLogger('bluebot')
@@ -44,7 +46,22 @@ client = atproto.Client()
 client.login(os.environ["APU"], os.environ["AP"])
 
 reddit = praw.Reddit(client_id=os.environ["CID"], client_secret=os.environ["CS"],
-                     user_agent="linux:bluebot:v0.0.1 (by /u/dariusisdumblol)")
+                     user_agent="linux:bluebot:v0.0.2 (by /u/dariusisdumblol)")
+
+
+def send_post_with_labels(client2, text, labels, embed):
+    return client2.com.atproto.repo.create_record(
+        models.ComAtprotoRepoCreateRecord.Data(
+            repo=client2.me.did,
+            collection=ids.AppBskyFeedPost,
+            record=models.AppBskyFeedPost.Record(
+                created_at=client2.get_current_time_iso(),
+                text=text,
+                labels=labels,
+                embed=embed
+            ),
+        )
+    )
 
 
 def duplicate_check(id):
@@ -97,6 +114,14 @@ def get_subreddit():
 def main():
     LOG.info("Starting...")
     client.login(os.environ["APU"], os.environ["AP"])
+
+    # this should of been here first lmao
+    labels = models.ComAtprotoLabelDefs.SelfLabels(
+        values=[
+            # idk what to do about nude posts on the subreddit so uhhhhh  dm me or smth
+            models.ComAtprotoLabelDefs.SelfLabel(val='sexual'),
+        ]
+    )
     try:
         limit = int(parser.get('reddit', 'limit'))
     except config.NoSectionError:
@@ -124,10 +149,15 @@ def main():
                 if not duplicate_check(post_id):
                     image_data = requests.get(image_url).content
                     # TODO: add ocr
-                    client.send_image(
-                        text=submission.title + " (u/" + submission.author.name + ")" + "  " + submission.url,
-                                      image=image_data,
-                                      image_alt='')
+                    # client.send_image(
+                    #    text=submission.title + " (u/" + submission.author.name + ")" + "  " + submission.source,
+                    #    image=image_data,
+                    #    image_alt='', )
+                    upload = client.upload_blob(image_data)
+                    images = [models.AppBskyEmbedImages.Image(alt='', image=upload.blob)]
+                    embed = models.AppBskyEmbedImages.Main(images=images)
+                    send_post_with_labels(client, submission.title + " (u/" + submission.author.name + ")", labels,
+                                          embed)
                     with open('posted_images.csv', 'a') as csvfile:
                         writer = csv.writer(csvfile)
                         writer.writerow([post_id])
@@ -137,7 +167,7 @@ def main():
                     last_post_id = submission.id
                 else:
                     LOG.info(f"Skipping already posted image: {image_url}")
-                    next
+                    continue
 
 
     except prawcore.exceptions.NotFound:
