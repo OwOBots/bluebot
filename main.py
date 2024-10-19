@@ -145,7 +145,7 @@ def main():
             post_id = submission.id
             if not submission.stickied:
                 LOG.info(f"{submission.title} ({submission.author.name})")
-                image_url = submission.preview['images'][0]['source']['url']
+                image_url = submission.url
                 if not duplicate_check(post_id):
                     image_data = requests.get(image_url).content
                     # TODO: add ocr
