@@ -16,6 +16,8 @@ import requests
 from atproto import models
 from atproto_client.models import ids
 
+POSTED_IMAGES_CSV = 'posted_images.csv'
+
 # this is dumb
 LOG = logging.getLogger('bluebot')
 LOG.setLevel(logging.DEBUG)
@@ -136,7 +138,7 @@ def main():
     last_post_id = None
     try:
         sub = get_subreddit()
-        with open('posted_images.csv', 'r') as csvfile:
+        with open(POSTED_IMAGES_CSV, 'r') as csvfile:
             reader = csv.reader(csvfile)
             posted_images = set(row[0] for row in reader)
 
@@ -158,7 +160,7 @@ def main():
                     embed = models.AppBskyEmbedImages.Main(images=images)
                     send_post_with_labels(client, submission.title + " (u/" + submission.author.name + ")", labels,
                                           embed)
-                    with open('posted_images.csv', 'a') as csvfile:
+                    with open(POSTED_IMAGES_CSV, 'a') as csvfile:
                         writer = csv.writer(csvfile)
                         writer.writerow([post_id])
                     LOG.info(f"Posted image: {image_url}")
