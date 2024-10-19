@@ -13,6 +13,7 @@ import dotenv
 import praw
 import prawcore
 import requests
+import tesserocr
 from atproto import models
 from atproto_client.models import ids
 
@@ -46,8 +47,11 @@ client = atproto.Client()
 client.login(os.environ["APU"], os.environ["AP"])
 
 reddit = praw.Reddit(client_id=os.environ["CID"], client_secret=os.environ["CS"],
-                     user_agent="linux:bluebot:v0.0.2 (by /u/dariusisdumblol)")
+                     user_agent="linux:bluebot:v0.0.3 (by /u/dariusisdumblol)")
 
+
+def ocr(image):
+    return tesserocr.image_to_text(image)
 
 def send_post_with_labels(client2, text, labels, embed):
     return client2.com.atproto.repo.create_record(
@@ -138,7 +142,7 @@ def main():
         sub = get_subreddit()
         with open('posted_images.csv', 'r') as csvfile:
             reader = csv.reader(csvfile)
-            posted_images = set(row[0] for row in reader)
+            # posted_images = set(row[0] for row in reader)
 
         new_posts_found = False
         for submission in sub.new(limit=limit):
@@ -148,13 +152,13 @@ def main():
                 image_url = submission.preview['images'][0]['source']['url']
                 if not duplicate_check(post_id):
                     image_data = requests.get(image_url).content
-                    # TODO: add ocr
+                    alttext = ocr(image_data)
                     # client.send_image(
                     #    text=submission.title + " (u/" + submission.author.name + ")" + "  " + submission.source,
                     #    image=image_data,
                     #    image_alt='', )
                     upload = client.upload_blob(image_data)
-                    images = [models.AppBskyEmbedImages.Image(alt='', image=upload.blob)]
+                    images = [models.AppBskyEmbedImages.Image(alt=alttext, image=upload.blob)]
                     embed = models.AppBskyEmbedImages.Main(images=images)
                     send_post_with_labels(client, submission.title + " (u/" + submission.author.name + ")", labels,
                                           embed)
