@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 import configparser as config
 import csv
+import io
 import logging
 import math
 import os
@@ -13,6 +14,7 @@ import dotenv
 import praw
 import prawcore
 import requests
+from PIL import Image
 from atproto import models
 from atproto_client.models import ids
 
@@ -49,6 +51,27 @@ client.login(os.environ["APU"], os.environ["AP"])
 
 reddit = praw.Reddit(client_id=os.environ["CID"], client_secret=os.environ["CS"],
                      user_agent="linux:bluebot:v0.0.2 (by /u/dariusisdumblol)")
+
+
+def compress_image(image_data, image_url):
+    # Open the image file
+    image = Image.open(io.BytesIO(image_data))
+
+    # Compress the image based on its file type
+    output = io.BytesIO()
+    if image_url.endswith('.jpg') or image_url.endswith('.jpeg'):
+        image.save(output, format="JPEG", quality=80)  # Adjust the quality as needed
+    elif image_url.endswith('.png'):
+        image.save(output, format="PNG", optimize=True)  # Enable PNG optimization
+    elif image_url.endswith('.gif'):
+        # GIFs are already compressed, so we can't compress them further
+        # However, we can still resize them if needed
+        image.save(output, format="GIF")
+    elif image_url.endswith('.bmp'):
+        image.save(output, format="BMP")  # BMPs are not compressible
+
+    compressed_image_data = output.getvalue()
+    return compressed_image_data
 
 
 def send_post_with_labels(client2, text, labels, embed):
@@ -171,10 +194,28 @@ def main():
                         lim_dict = reddit.auth.limits
                         LOG.info(lim_dict)  # Only update last_post_id if the submission is new
                         last_post_id = submission.id
-                    # TODO: Make image size shrinking
                     else:
-                        LOG.info(f"Skipping image because it's too big: {image_url}")
-                        LOG.info(f"Image size: {image_size} bytes")
+                        LOG.info(f"Resizing image because it's too big: {image_url}")
+                        compressed_image_data = compress_image(image_data, image_url)
+                        compressed_image_size = len(compressed_image_data)
+                        if compressed_image_size > max_size:
+                            LOG.info(f"Skipping image because it's still too big after compression: {image_url}")
+                            continue
+                        else:
+                            upload = client.upload_blob(compressed_image_data)
+                            images = [models.AppBskyEmbedImages.Image(alt='', image=upload.blob)]
+                            embed = models.AppBskyEmbedImages.Main(images=images)
+                            send_post_with_labels(client, submission.title + " (u/" + submission.author.name + ")",
+                                                  labels,
+                                                  embed)
+                            with open(POSTED_IMAGES_CSV, 'a') as csvfile:
+                                writer = csv.writer(csvfile)
+                                writer.writerow([post_id])
+                            LOG.info(f"Posted compressed image: {image_url}")
+                            lim_dict = reddit.auth.limits
+                            LOG.info(lim_dict)
+                            last_post_id = submission.id
+                            LOG.info(f"Image size: {image_size} bytes")
                 else:
                     LOG.info(f"Skipping already posted image: {image_url}")
                     continue
