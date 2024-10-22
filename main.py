@@ -145,28 +145,36 @@ def main():
         new_posts_found = False
         for submission in sub.new(limit=limit):
             post_id = submission.id
-            if not submission.stickied:
+            if not submission.stickied and not submission.is_self and submission.url.endswith(
+                    ('.jpg', '.png', '.gif', '.bmp')):
                 LOG.info(f"{submission.title} ({submission.author.name})")
                 image_url = submission.url
                 if not duplicate_check(post_id):
                     image_data = requests.get(image_url).content
-                    # TODO: add ocr
-                    # client.send_image(
-                    #    text=submission.title + " (u/" + submission.author.name + ")" + "  " + submission.source,
-                    #    image=image_data,
-                    #    image_alt='', )
-                    upload = client.upload_blob(image_data)
-                    images = [models.AppBskyEmbedImages.Image(alt='', image=upload.blob)]
-                    embed = models.AppBskyEmbedImages.Main(images=images)
-                    send_post_with_labels(client, submission.title + " (u/" + submission.author.name + ")", labels,
-                                          embed)
-                    with open(POSTED_IMAGES_CSV, 'a') as csvfile:
-                        writer = csv.writer(csvfile)
-                        writer.writerow([post_id])
-                    LOG.info(f"Posted image: {image_url}")
-                    lim_dict = reddit.auth.limits
-                    LOG.info(lim_dict)  # Only update last_post_id if the submission is new
-                    last_post_id = submission.id
+                    image_size = len(image_data)
+                    max_size = 976560
+                    if image_size <= max_size:
+                        # TODO: add ocr
+                        # client.send_image(
+                        #    text=submission.title + " (u/" + submission.author.name + ")" + "  " + submission.source,
+                        #    image=image_data,
+                        #    image_alt='', )
+                        upload = client.upload_blob(image_data)
+                        images = [models.AppBskyEmbedImages.Image(alt='', image=upload.blob)]
+                        embed = models.AppBskyEmbedImages.Main(images=images)
+                        send_post_with_labels(client, submission.title + " (u/" + submission.author.name + ")", labels,
+                                              embed)
+                        with open(POSTED_IMAGES_CSV, 'a') as csvfile:
+                            writer = csv.writer(csvfile)
+                            writer.writerow([post_id])
+                        LOG.info(f"Posted image: {image_url}")
+                        lim_dict = reddit.auth.limits
+                        LOG.info(lim_dict)  # Only update last_post_id if the submission is new
+                        last_post_id = submission.id
+                    # TODO: Make image size shrinking
+                    else:
+                        LOG.info(f"Skipping image because it's too big: {image_url}")
+                        LOG.info(f"Image size: {image_size} bytes")
                 else:
                     LOG.info(f"Skipping already posted image: {image_url}")
                     continue
