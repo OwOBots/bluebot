@@ -173,7 +173,7 @@ def main():
                 LOG.info(f"{submission.title} ({submission.author.name})")
                 image_url = submission.url
                 if not duplicate_check(post_id):
-                    image_data = requests.get(image_url).content
+                    image_data = requests.get(image_url, timeout=None).content
                     image_size = len(image_data)
                     max_size = 976560
                     if image_size <= max_size:
