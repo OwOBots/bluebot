@@ -187,5 +187,9 @@ def main():
 
 if __name__ == "__main__":
     while True:
-        main()
-        notify_sleep(sleeptime=1800, reason=f" (pos)")
+        try:
+            main()
+            notify_sleep(sleeptime=1800, reason=f" (pos)")
+        except Exception as e:
+            LOG.error(f"Error: {e}")
+        time.sleep(10)
