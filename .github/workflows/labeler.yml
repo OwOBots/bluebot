@@ -1,0 +1,19 @@
+# Add 'Code-changes' label to any PR that contains changes to files with a .py extension within the entire repository
+Code-changes:
+  - changed-files:
+      - any-glob-to-any-file: '*.py'
+
+
+
+# Add 'dependency' label to any PR that contains changes to files within the 'requirements' folder or its subfolders
+dependency:
+  - changed-files:
+      - any-glob-to-any-file: "requirements.txt"
+
+# Add 'feature' label to any PR where the head branch name starts with `feature` or has a `feature` section in the name
+feature:
+  - head-branch: [ '^feature', 'feature' ]
+
+# Add 'release' label to any PR that is opened against the `main` branch
+release:
+  - base-branch: 'main'
