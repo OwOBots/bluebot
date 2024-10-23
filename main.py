@@ -54,6 +54,16 @@ reddit = praw.Reddit(client_id=os.environ["CID"], client_secret=os.environ["CS"]
 
 
 def compress_image(image_data, image_url):
+    """
+    Compresses an image based on its file type and returns the compressed image data.
+
+    Args:
+        image_data (bytes): The binary data of the image to be compressed.
+        image_url (str): The URL of the image, used to determine the file type.
+
+    Returns:
+        bytes: The binary data of the compressed image.
+    """
     # Open the image file
     image = Image.open(io.BytesIO(image_data))
 
@@ -75,6 +85,18 @@ def compress_image(image_data, image_url):
 
 
 def send_post_with_labels(client2, text, labels, embed):
+    """
+    Sends a post with labels using the given client.
+
+    Args:
+        client2 (atproto.Client): The client to use for sending the post.
+        text (str): The text of the post.
+        labels (models.ComAtprotoLabelDefs.SelfLabels): The labels to apply to the post.
+        embed (models.AppBskyEmbedImages.Main): The embed content to include in the post.
+
+    Returns:
+        models.ComAtprotoRepoCreateRecord.Response: The response from the server.
+    """
     return client2.com.atproto.repo.create_record(
         models.ComAtprotoRepoCreateRecord.Data(
             repo=client2.me.did,
@@ -124,6 +146,15 @@ def notify_sleep(sleeptime, interval=5 * 60, reason=""):
 
 
 def get_subreddit():
+    """
+    Retrieves the subreddit specified in the configuration file.
+
+    Returns:
+        praw.models.Subreddit: The subreddit object for the specified subreddit.
+
+    Raises:
+        SystemExit: If the 'reddit' section or 'subreddit' key is not found in the config file.
+    """
     try:
         sub = parser.get('reddit', 'subreddit')
         LOG.info(f"Trying to access subreddit: {sub}")
@@ -200,6 +231,9 @@ def main():
                         compressed_image_size = len(compressed_image_data)
                         if compressed_image_size > max_size:
                             LOG.info(f"Skipping image because it's still too big after compression: {image_url}")
+                            with open(POSTED_IMAGES_CSV, 'a') as csvfile:
+                                writer = csv.writer(csvfile)
+                                writer.writerow([post_id])
                             continue
                         else:
                             upload = client.upload_blob(compressed_image_data)
@@ -222,7 +256,6 @@ def main():
 
 
     except prawcore.exceptions.NotFound:
-
         LOG.error("Error: Subreddit not found. Please check the subreddit name in your config file.")
 
 
