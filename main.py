@@ -172,10 +172,11 @@ def main():
     client.login(os.environ["APU"], os.environ["AP"])
 
     # this should of been here first lmao
+    label = parser.get('bsky', 'label')
     labels = models.ComAtprotoLabelDefs.SelfLabels(
         values=[
             # idk what to do about nude posts on the subreddit so uhhhhh  dm me or smth
-            models.ComAtprotoLabelDefs.SelfLabel(val='sexual'),
+            models.ComAtprotoLabelDefs.SelfLabel(val=label),
         ]
     )
     try:
