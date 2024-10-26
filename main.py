@@ -198,7 +198,7 @@ def main():
             posted_images = set(row[0] for row in reader)
 
         new_posts_found = False
-        for submission in sub.new(limit=limit):
+        for submission in sub.hot(limit=limit):
             post_id = submission.id
             if not submission.stickied and not submission.is_self and submission.url.endswith(
                     ('.jpg', '.png', '.gif', '.bmp')):
