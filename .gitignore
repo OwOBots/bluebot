@@ -162,3 +162,4 @@ cython_debug/
 .idea/
 # grrra testing stuff floods the csv
 posted_images.csv
+image_cache
