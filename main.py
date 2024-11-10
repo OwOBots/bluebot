@@ -15,6 +15,7 @@ import dotenv
 import praw
 import prawcore
 import requests
+from urllib.parse import urlparse
 from PIL import Image
 from atproto import models
 from atproto_client.models import ids
@@ -230,7 +231,8 @@ def main():
         for submission in sub.hot():
             if len(results) >= limit:  # Manually enforce your desired limit here
                 continue
-            if 'imgur.com' in submission.url:
+            parsed_url = urlparse(submission.url)
+            if parsed_url.hostname == 'imgur.com':
                 LOG.info(f"Skipping Imgur post: {submission.url}")
                 continue
             post_id = submission.id
