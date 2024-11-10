@@ -196,12 +196,15 @@ def main():
         with open(POSTED_IMAGES_CSV, 'r') as csvfile:
             reader = csv.reader(csvfile)
             posted_images = set(row[0] for row in reader)
-
+        results = []
         new_posts_found = False
-        for submission in sub.hot(limit=limit):
+        for submission in sub.hot():
+            if len(results) >= limit:  # Manually enforce your desired limit here
+                continue
             post_id = submission.id
             if not submission.stickied and not submission.is_self and submission.url.endswith(
                     ('.jpg', '.png', '.gif', '.bmp')):
+                results.append(submission)
                 LOG.info(f"{submission.title} ({submission.author.name})")
                 image_url = submission.url
                 if not duplicate_check(post_id):
