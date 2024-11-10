@@ -58,7 +58,7 @@ def ImgPrep(image_data):
     if not os.path.exists(CACHE_FOLDER):
         os.makedirs(CACHE_FOLDER)
 
-    image_hash = hashlib.md5(image_data).hexdigest()
+    image_hash = hashlib.md5(image_data, usedforsecurity=False).hexdigest()
 
     # lets check if the image is already in the cache
     cache_path = os.path.join(CACHE_FOLDER, image_hash)
