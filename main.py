@@ -167,8 +167,8 @@ def get_subreddit():
         sys.exit(1)
 
 
-def main(dry_run=False):
-    LOG.info("Starting in dry run mode..." if dry_run else "Starting...")
+def main():
+    LOG.info("Starting...")
     client.login(os.environ["APU"], os.environ["AP"])
 
     # this should of been here first lmao
@@ -196,29 +196,48 @@ def main(dry_run=False):
         with open(POSTED_IMAGES_CSV, 'r') as csvfile:
             reader = csv.reader(csvfile)
             posted_images = set(row[0] for row in reader)
-        results = []
-        for submission in sub.hot():
-            # results.append(submission)
-            if len(results) >= limit:
-                break
+
+        new_posts_found = False
+        for submission in sub.hot(limit=limit):
             post_id = submission.id
-            if not submission.stickied and submission.url.endswith(
+            if not submission.stickied and not submission.is_self and submission.url.endswith(
                     ('.jpg', '.png', '.gif', '.bmp')):
-                results.append(submission)
                 LOG.info(f"{submission.title} ({submission.author.name})")
                 image_url = submission.url
                 if not duplicate_check(post_id):
                     image_data = requests.get(image_url, timeout=60).content
                     image_size = len(image_data)
                     max_size = 976560
-                    if not dry_run:
-                        if image_size <= max_size:
-                            # TODO: add ocr
-                            # client.send_image(
-                            #    text=submission.title + " (u/" + submission.author.name + ")" + "  " + submission.source,
-                            #    image=image_data,
-                            #    image_alt='', )
-                            upload = client.upload_blob(image_data)
+                    if image_size <= max_size:
+                        # TODO: add ocr
+                        # client.send_image(
+                        #    text=submission.title + " (u/" + submission.author.name + ")" + "  " + submission.source,
+                        #    image=image_data,
+                        #    image_alt='', )
+                        upload = client.upload_blob(image_data)
+                        images = [models.AppBskyEmbedImages.Image(alt='', image=upload.blob)]
+                        embed = models.AppBskyEmbedImages.Main(images=images)
+                        send_post_with_labels(client, submission.title + " (u/" + submission.author.name + ")", labels,
+                                              embed)
+                        with open(POSTED_IMAGES_CSV, 'a') as csvfile:
+                            writer = csv.writer(csvfile)
+                            writer.writerow([post_id])
+                        LOG.info(f"Posted image: {image_url}")
+                        lim_dict = reddit.auth.limits
+                        LOG.info(lim_dict)  # Only update last_post_id if the submission is new
+                        last_post_id = submission.id
+                    else:
+                        LOG.info(f"Resizing image because it's too big: {image_url}")
+                        compressed_image_data = compress_image(image_data, image_url)
+                        compressed_image_size = len(compressed_image_data)
+                        if compressed_image_size > max_size:
+                            LOG.info(f"Skipping image because it's still too big after compression: {image_url}")
+                            with open(POSTED_IMAGES_CSV, 'a') as csvfile:
+                                writer = csv.writer(csvfile)
+                                writer.writerow([post_id])
+                            continue
+                        else:
+                            upload = client.upload_blob(compressed_image_data)
                             images = [models.AppBskyEmbedImages.Image(alt='', image=upload.blob)]
                             embed = models.AppBskyEmbedImages.Main(images=images)
                             send_post_with_labels(client, submission.title + " (u/" + submission.author.name + ")",
@@ -227,38 +246,14 @@ def main(dry_run=False):
                             with open(POSTED_IMAGES_CSV, 'a') as csvfile:
                                 writer = csv.writer(csvfile)
                                 writer.writerow([post_id])
-                            LOG.info(f"Posted image: {image_url}")
+                            LOG.info(f"Posted compressed image: {image_url}")
                             lim_dict = reddit.auth.limits
-                            LOG.info(lim_dict)  # Only update last_post_id if the submission is new
+                            LOG.info(lim_dict)
                             last_post_id = submission.id
-                        else:
-                            LOG.info(f"Resizing image because it's too big: {image_url}")
-                            compressed_image_data = compress_image(image_data, image_url)
-                            compressed_image_size = len(compressed_image_data)
-                            if compressed_image_size > max_size:
-                                LOG.info(f"Skipping image because it's still too big after compression: {image_url}")
-                                with open(POSTED_IMAGES_CSV, 'a') as csvfile:
-                                    writer = csv.writer(csvfile)
-                                    writer.writerow([post_id])
-                                continue
-                            else:
-                                upload = client.upload_blob(compressed_image_data)
-                                images = [models.AppBskyEmbedImages.Image(alt='', image=upload.blob)]
-                                embed = models.AppBskyEmbedImages.Main(images=images)
-                                send_post_with_labels(client, submission.title + " (u/" + submission.author.name + ")",
-                                                      labels,
-                                                      embed)
-                                with open(POSTED_IMAGES_CSV, 'a') as csvfile:
-                                    writer = csv.writer(csvfile)
-                                    writer.writerow([post_id])
-                                LOG.info(f"Posted compressed image: {image_url}")
-                                lim_dict = reddit.auth.limits
-                                LOG.info(lim_dict)
-                                last_post_id = submission.id
-                                LOG.info(f"Image size: {image_size} bytes")
-                    else:
-                        LOG.info(f"Skipping already posted image: {image_url}")
-                        continue
+                            LOG.info(f"Image size: {image_size} bytes")
+                else:
+                    LOG.info(f"Skipping already posted image: {image_url}")
+                    continue
 
 
     except prawcore.exceptions.NotFound:
@@ -266,20 +261,10 @@ def main(dry_run=False):
 
 
 if __name__ == "__main__":
-    dry_run = "--dry-run" in sys.argv or "-d" in sys.argv
     while True:
         try:
-            main(dry_run=dry_run)
-            if not dry_run:
-                notify_sleep(sleeptime=1800, reason=f" (pos)")
-            else:
-                LOG.info("Dry run complete. Exiting.")
-                sys.exit(0)
+            main()
+            notify_sleep(sleeptime=1800, reason=f" (pos)")
         except Exception as e:
-            error = 1
             LOG.error(f"Error: {e}")
-            error += 1
-            if error == 4:
-                LOG.error(f"Error: Too many errors. Exiting.")
-                sys.exit(1)
         time.sleep(10)
