@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 import configparser as config
 import csv
+import hashlib
 import io
 import logging
 import math
@@ -14,12 +15,13 @@ import dotenv
 import praw
 import prawcore
 import requests
+from urllib.parse import urlparse
 from PIL import Image
 from atproto import models
 from atproto_client.models import ids
 
 POSTED_IMAGES_CSV = 'posted_images.csv'
-
+CACHE_FOLDER = 'image_cache'
 # this is dumb
 LOG = logging.getLogger('bluebot')
 LOG.setLevel(logging.DEBUG)
@@ -51,6 +53,34 @@ client.login(os.environ["APU"], os.environ["AP"])
 
 reddit = praw.Reddit(client_id=os.environ["CID"], client_secret=os.environ["CS"],
                      user_agent="linux:bluebot:v0.0.2 (by /u/dariusisdumblol)")
+
+
+def ImgPrep(image_data):
+    if not os.path.exists(CACHE_FOLDER):
+        os.makedirs(CACHE_FOLDER)
+
+    image_hash = hashlib.md5(image_data, usedforsecurity=False).hexdigest()
+
+    # lets check if the image is already in the cache
+    cache_path = os.path.join(CACHE_FOLDER, image_hash)
+    if os.path.exists(cache_path):
+        with open(cache_path, 'rb') as f:
+            return f.read(), 'image/jpeg'
+
+    # Open the image data with PIL
+    image = Image.open(io.BytesIO(image_data))
+
+    # Convert the image to JPEG if not already in a compatible format
+    if image.format not in ['JPEG', 'PNG', 'GIF', 'BMP']:
+        LOG.info(f"Converting image format from {image.format} to JPEG.")
+        output = io.BytesIO()
+        image.convert("RGB").save(output, format="JPEG")
+        return output.getvalue(), 'image/jpeg'
+
+    with open(cache_path, 'wb') as f:
+        f.write(image_data)
+
+    return image_data, 'image/jpeg'
 
 
 def compress_image(image_data, image_url):
@@ -201,6 +231,10 @@ def main():
         for submission in sub.hot():
             if len(results) >= limit:  # Manually enforce your desired limit here
                 continue
+            parsed_url = urlparse(submission.url)
+            if parsed_url.hostname == 'imgur.com':
+                LOG.info(f"Skipping Imgur post: {submission.url}")
+                continue
             post_id = submission.id
             if not submission.stickied and not submission.is_self and submission.url.endswith(
                     ('.jpg', '.png', '.gif', '.bmp')):
@@ -217,7 +251,8 @@ def main():
                         #    text=submission.title + " (u/" + submission.author.name + ")" + "  " + submission.source,
                         #    image=image_data,
                         #    image_alt='', )
-                        upload = client.upload_blob(image_data)
+                        cached_image_data, mime_type = ImgPrep(image_data)
+                        upload = client.upload_blob(cached_image_data)
                         images = [models.AppBskyEmbedImages.Image(alt='', image=upload.blob)]
                         embed = models.AppBskyEmbedImages.Main(images=images)
                         send_post_with_labels(client, submission.title + " (u/" + submission.author.name + ")", labels,
@@ -240,7 +275,8 @@ def main():
                                 writer.writerow([post_id])
                             continue
                         else:
-                            upload = client.upload_blob(compressed_image_data)
+                            cached_image_data, mime_type = ImgPrep(compressed_image_data)
+                            upload = client.upload_blob(cached_image_data)
                             images = [models.AppBskyEmbedImages.Image(alt='', image=upload.blob)]
                             embed = models.AppBskyEmbedImages.Main(images=images)
                             send_post_with_labels(client, submission.title + " (u/" + submission.author.name + ")",
