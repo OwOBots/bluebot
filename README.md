@@ -18,8 +18,7 @@ python main.py
 ```
 
 ***
-*but TDPNG i use an arch based distro i cant install shit with pip*  [**USE VENV
-**](https://docs.python.org/3/library/venv.html)
+*but TDPNG i use an arch based distro i cant install shit with pip*  [**USE VENV**](https://docs.python.org/3/library/venv.html)
 
 
  ****
