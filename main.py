@@ -38,6 +38,7 @@ LOG.debug("goofy ahh logger test")
 parser = config.ConfigParser()
 parser.read('config.ini')
 
+
 dotenv.load_dotenv()
 
 # Check if required environment variables are set
@@ -46,6 +47,7 @@ for var in required_vars:
     if var not in os.environ:
         LOG.critical(f"Error: {var} environment variable is not set")
         sys.exit(1)
+
 
 client = atproto.Client()
 client.login(os.environ["APU"], os.environ["AP"])
@@ -101,14 +103,21 @@ def compress_image(image_data, image_url):
     if image_url.endswith('.jpg') or image_url.endswith('.jpeg'):
         image.save(output, format="JPEG", quality=80)  # Adjust the quality as needed
     elif image_url.endswith('.png'):
-        image.save(output, format="PNG", optimize=True)  # Enable PNG optimization
+        width, height = image.size
+        len(image_data)
+        LOG.info("Image size before compression: {}x{} ({} bytes)".format(width, height, len(image_data)))
+        new_size = (width // 2, height // 2)
+        image.resize(new_size, Image.Resampling.LANCZOS)
+        image.save(output, format="JPEG", optimize=True,
+                   quality=20)  # jpeg is lossy but its smaller (i wish bsky would support blobs more than 1mb but whatever)
     elif image_url.endswith('.gif'):
         # GIFs are already compressed, so we can't compress them further
         # However, we can still resize them if needed
         image.save(output, format="GIF")
     elif image_url.endswith('.bmp'):
         image.save(output, format="BMP")  # BMPs are not compressible
-
+    maxsize = 976560
+    # Check if the image size is greater than the maximum size
     compressed_image_data = output.getvalue()
     return compressed_image_data
 
