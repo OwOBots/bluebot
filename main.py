@@ -66,7 +66,9 @@ def ImgPrep(image_data):
     cache_path = os.path.join(CACHE_FOLDER, image_hash)
     if os.path.exists(cache_path):
         with open(cache_path, 'rb') as f:
-            return f.read(), 'image/jpeg'
+            with open(cache_path + "_size", 'rt') as f_size:
+                height, width = f_size.read().split(',')
+                return f.read(), 'image/jpeg', int(height), int(width)
 
     # Open the image data with PIL
     image = Image.open(io.BytesIO(image_data))
@@ -76,12 +78,14 @@ def ImgPrep(image_data):
         LOG.info(f"Converting image format from {image.format} to JPEG.")
         output = io.BytesIO()
         image.convert("RGB").save(output, format="JPEG")
-        return output.getvalue(), 'image/jpeg'
+        return output.getvalue(), 'image/jpeg', image.height, image.width
 
     with open(cache_path, 'wb') as f:
         f.write(image_data)
+    with open(cache_path + "_size", 'wt') as f:
+        f.write(f"{image.height},{image.width}")
 
-    return image_data, 'image/jpeg'
+    return image_data, 'image/jpeg', image.height, image.width
 
 
 def compress_image(image_data, image_url):
@@ -258,9 +262,10 @@ def main():
                         #    text=submission.title + " (u/" + submission.author.name + ")" + "  " + submission.source,
                         #    image=image_data,
                         #    image_alt='', )
-                        cached_image_data, mime_type = ImgPrep(image_data)
+                        cached_image_data, mime_type, height, width = ImgPrep(image_data)
+                        ratio_as_bsky = models.AppBskyEmbedDefs.AspectRatio(height=height, width=width)
                         upload = client.upload_blob(cached_image_data)
-                        images = [models.AppBskyEmbedImages.Image(alt='', image=upload.blob)]
+                        images = [models.AppBskyEmbedImages.Image(alt='', image=upload.blob, aspect_ratio=ratio_as_bsky)]
                         embed = models.AppBskyEmbedImages.Main(images=images)
                         send_post_with_labels(client, submission.title + " (u/" + submission.author.name + ")", labels,
                                               embed)
@@ -282,9 +287,10 @@ def main():
                                 writer.writerow([post_id])
                             continue
                         else:
-                            cached_image_data, mime_type = ImgPrep(compressed_image_data)
+                            cached_image_data, mime_type, height, width = ImgPrep(compressed_image_data)
+                            ratio_as_bsky = models.AppBskyEmbedDefs.AspectRatio(height=height, width=width)
                             upload = client.upload_blob(cached_image_data)
-                            images = [models.AppBskyEmbedImages.Image(alt='', image=upload.blob)]
+                            images = [models.AppBskyEmbedImages.Image(alt='', image=upload.blob, aspect_ratio=ratio_as_bsky)]
                             embed = models.AppBskyEmbedImages.Main(images=images)
                             send_post_with_labels(client, submission.title + " (u/" + submission.author.name + ")",
                                                   labels,
