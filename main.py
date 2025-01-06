@@ -100,9 +100,7 @@ def ImgPrep(image_data):
     if image.format not in ['JPEG', 'PNG', 'GIF', 'BMP']:
         LOG.info(f"Converting image format from {image.format} to JPEG.")
         output = io.BytesIO()
-        if image.mode == 'RGBA':
-            LOG.info("Converting RGBA image to RGB.")
-            image = image.convert("RGB")
+        
         image.convert("RGB").save(output, format="JPEG")
         return output.getvalue(), 'image/jpeg', image.height, image.width
     
@@ -137,9 +135,10 @@ def compress_image(image_data, image_url):
         len(image_data)
         LOG.info("Image size before compression: {}x{} ({} bytes)".format(width, height, len(image_data)))
         new_size = (width // 2, height // 2)
+        # should fix cannot write mode RGBA as JPEG at the cost of bluesky not supporting files over 1mb in size (grr)
         image.resize(new_size, Image.Resampling.LANCZOS)
-        image.save(output, format="JPEG", optimize=True,
-                   quality=20)  # jpeg is lossy but its smaller (i wish bsky would support blobs more than 1mb but whatever)
+        image.save(output, format="PNG", optimize=True, quality=20)
+        # (i wish bsky would support blobs more than 1mb but whatever)
     elif image_url.endswith('.gif'):
         # TODO: convert gif to mp4 so it can be uploaded to Bsky. because bsky doesn't support gifs
         #  (the file format, they convert it to webm or mp4 i cant remember) for some ungodly reason
