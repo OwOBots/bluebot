@@ -1,24 +1,30 @@
 # BlueBot
 
-    Tootbot but for bluesky
+Tootbot but for bluesky
 
 ****
 # DISCLAIMER
 
-     Very basic. No guarantees. Use at your own risk. Follow TOS and Privacy Policy.
+Very basic. No guarantees. Use at your own risk. Follow TOS and Privacy Policy.
 
-## Usage
+***
+
+# Installation
+
+If on windows, install ffmpeg and add it to your path or use winget. if you are on linux you know what to do.
+
+    git clone https://github.com/OwOBots/bluebot
+    pip install -r requirements.txt
+    Set up the .env file
+    python main.py
 
 ***
 ### Note: This was only tested on python 3.12
 
-``` bash
-pip install -r requirements.txt
-python main.py
-```
 
 ***
-*but TDPNG i use an arch based distro i cant install shit with pip*  [**USE VENV**](https://docs.python.org/3/library/venv.html)
+*But TDPNG i use an arch based distro i cant install shit with pip*  [**USE VENV
+**](https://docs.python.org/3/library/venv.html)
 
 
  ****
@@ -57,3 +63,4 @@ python main.py
 - [atproto](https://github.com/MarshalX/atproto)
 - [The Og tootbot](https://github.com/corbindavenport/tootbot)
 - [tootbotX](https://gitlab.com/mocchapi/tootbotX)
+- [FFmpeg-python](https://github.com/kkroening/ffmpeg-python)
