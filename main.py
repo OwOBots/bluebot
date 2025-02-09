@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3.12
 # -*- coding: utf-8 -*-
 import configparser as config
 import csv
@@ -10,15 +10,17 @@ import os
 import sys
 import time
 
-import atproto
+import atproto.exceptions
 import dotenv
 import praw
 import prawcore
 import requests
 from PIL import Image
 from atproto import models
+from atproto_client import Client
 from atproto_client.models import ids
 
+# Constants and global variables go here
 POSTED_IMAGES_CSV = 'posted_images.csv'
 CACHE_FOLDER = 'image_cache'
 # this is dumb
@@ -33,11 +35,9 @@ file_handler.setFormatter(formatter)
 console_handler.setFormatter(formatter)
 LOG.addHandler(file_handler)
 LOG.addHandler(console_handler)
-LOG.debug("goofy ahh logger test")
 
 parser = config.ConfigParser()
 parser.read('config.ini')
-
 
 dotenv.load_dotenv()
 
@@ -49,39 +49,67 @@ for var in required_vars:
         sys.exit(1)
 
 
-client = atproto.Client()
+# stolen from https://github.com/MarshalX/atproto/discussions/167#discussioncomment-8579573
+class RateLimitedClient(Client):
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        
+        self._limit = self._remaining = self._reset = None
+    
+    def get_rate_limit(self):
+        return self._limit, self._remaining, self._reset
+    
+    def _invoke(self, *args, **kwargs):
+        response = super()._invoke(*args, **kwargs)
+        
+        self._limit = response.headers.get('ratelimit-limit')
+        self._remaining = response.headers.get('ratelimit-remaining')
+        self._reset = response.headers.get('ratelimit-reset')
+        
+        return response
+
+
+# client = atproto.Client()
+
+client = RateLimitedClient()
 client.login(os.environ["APU"], os.environ["AP"])
 
 reddit = praw.Reddit(client_id=os.environ["CID"], client_secret=os.environ["CS"],
-                     user_agent="linux:bluebot:v0.0.2 (by /u/dariusisdumblol)")
+                     user_agent="linux:bluebot:v0.1.0 (by /u/OwO_bots)"
+                     )
 
 
 def ImgPrep(image_data):
     if not os.path.exists(CACHE_FOLDER):
         os.makedirs(CACHE_FOLDER)
-
+    
     image_hash = hashlib.md5(image_data, usedforsecurity=False).hexdigest()
-
+    
     # lets check if the image is already in the cache
     cache_path = os.path.join(CACHE_FOLDER, image_hash)
     if os.path.exists(cache_path):
         with open(cache_path, 'rb') as f:
-            return f.read(), 'image/jpeg'
-
+            with open(cache_path + "_size", 'rt') as f_size:
+                height, width = f_size.read().split(',')
+                return f.read(), 'image/jpeg', int(height), int(width)
+    
     # Open the image data with PIL
     image = Image.open(io.BytesIO(image_data))
-
+    
     # Convert the image to JPEG if not already in a compatible format
     if image.format not in ['JPEG', 'PNG', 'GIF', 'BMP']:
         LOG.info(f"Converting image format from {image.format} to JPEG.")
         output = io.BytesIO()
+        
         image.convert("RGB").save(output, format="JPEG")
-        return output.getvalue(), 'image/jpeg'
-
+        return output.getvalue(), 'image/jpeg', image.height, image.width
+    
     with open(cache_path, 'wb') as f:
         f.write(image_data)
-
-    return image_data, 'image/jpeg'
+    with open(cache_path + "_size", 'wt') as f:
+        f.write(f"{image.height},{image.width}")
+    
+    return image_data, 'image/jpeg', image.height, image.width
 
 
 def compress_image(image_data, image_url):
@@ -97,7 +125,7 @@ def compress_image(image_data, image_url):
     """
     # Open the image file
     image = Image.open(io.BytesIO(image_data))
-
+    
     # Compress the image based on its file type
     output = io.BytesIO()
     if image_url.endswith('.jpg') or image_url.endswith('.jpeg'):
@@ -107,12 +135,13 @@ def compress_image(image_data, image_url):
         len(image_data)
         LOG.info("Image size before compression: {}x{} ({} bytes)".format(width, height, len(image_data)))
         new_size = (width // 2, height // 2)
+        # should fix cannot write mode RGBA as JPEG at the cost of bluesky not supporting files over 1mb in size (grr)
         image.resize(new_size, Image.Resampling.LANCZOS)
-        image.save(output, format="JPEG", optimize=True,
-                   quality=20)  # jpeg is lossy but its smaller (i wish bsky would support blobs more than 1mb but whatever)
+        image.save(output, format="PNG", optimize=True, quality=20)
+        # (i wish bsky would support blobs more than 1mb but whatever)
     elif image_url.endswith('.gif'):
-        # GIFs are already compressed, so we can't compress them further
-        # However, we can still resize them if needed
+        # TODO: convert gif to mp4 so it can be uploaded to Bsky. because bsky doesn't support gifs
+        #  (the file format, they convert it to webm or mp4 i cant remember) for some ungodly reason
         image.save(output, format="GIF")
     elif image_url.endswith('.bmp'):
         image.save(output, format="BMP")  # BMPs are not compressible
@@ -174,7 +203,7 @@ def notify_sleep(sleeptime, interval=5 * 60, reason=""):
             zzzz = interval
         else:
             zzzz = timeleft
-
+        
         if loop2:
             LOG.info(f"{round(timeleft / 60, 1)}m remaining.")
         else:
@@ -207,8 +236,7 @@ def get_subreddit():
 
 def main():
     LOG.info("Starting...")
-    client.login(os.environ["APU"], os.environ["AP"])
-
+    
     # this should of been here first lmao
     label = parser.get('bsky', 'label')
     labels = models.ComAtprotoLabelDefs.SelfLabels(
@@ -258,9 +286,11 @@ def main():
                         #    text=submission.title + " (u/" + submission.author.name + ")" + "  " + submission.source,
                         #    image=image_data,
                         #    image_alt='', )
-                        cached_image_data, mime_type = ImgPrep(image_data)
+                        cached_image_data, mime_type, height, width = ImgPrep(image_data)
+                        ratio_as_bsky = models.AppBskyEmbedDefs.AspectRatio(height=height, width=width)
                         upload = client.upload_blob(cached_image_data)
-                        images = [models.AppBskyEmbedImages.Image(alt='', image=upload.blob)]
+                        images = [
+                            models.AppBskyEmbedImages.Image(alt='', image=upload.blob, aspect_ratio=ratio_as_bsky)]
                         embed = models.AppBskyEmbedImages.Main(images=images)
                         send_post_with_labels(client, submission.title + " (u/" + submission.author.name + ")", labels,
                                               embed)
@@ -282,9 +312,11 @@ def main():
                                 writer.writerow([post_id])
                             continue
                         else:
-                            cached_image_data, mime_type = ImgPrep(compressed_image_data)
+                            cached_image_data, mime_type, height, width = ImgPrep(compressed_image_data)
+                            ratio_as_bsky = models.AppBskyEmbedDefs.AspectRatio(height=height, width=width)
                             upload = client.upload_blob(cached_image_data)
-                            images = [models.AppBskyEmbedImages.Image(alt='', image=upload.blob)]
+                            images = [
+                                models.AppBskyEmbedImages.Image(alt='', image=upload.blob, aspect_ratio=ratio_as_bsky)]
                             embed = models.AppBskyEmbedImages.Main(images=images)
                             send_post_with_labels(client, submission.title + " (u/" + submission.author.name + ")",
                                                   labels,
@@ -300,8 +332,8 @@ def main():
                 else:
                     LOG.info(f"Skipping already posted image: {image_url}")
                     continue
-
-
+    
+    
     except prawcore.exceptions.NotFound:
         LOG.error("Error: Subreddit not found. Please check the subreddit name in your config file.")
 
@@ -310,7 +342,17 @@ if __name__ == "__main__":
     while True:
         try:
             main()
-            notify_sleep(sleeptime=1800, reason=f" (pos)")
-        except Exception as e:
-            LOG.error(f"Error: {e}")
-        time.sleep(10)
+            notify_sleep(sleeptime=36000, reason=" (no new posts)")
+        except Exception as at:
+            LOG.error(f"Error: {at}")
+            if 'ratelimit-reset' in str(at):
+                # reset is in unix time
+                limit, remaining, reset = client.get_rate_limit()
+                current_time = int(time.time())
+                sleep_time = max(int(reset) - current_time, 0)
+                LOG.info(f"Rate limit reached. Limit: {limit}, Remaining: {remaining}, Reset: {reset}")
+                LOG.info(f"Sleeping for {sleep_time} seconds.")
+                notify_sleep(sleeptime=sleep_time, reason=" (rate limit reached)")
+            # notify_sleep(sleeptime=int(reset), reason=" (rate limit reached)")
+            else:
+                notify_sleep(sleeptime=36000, reason=f" {at}")
