@@ -46,12 +46,12 @@ dotenv.load_dotenv()
 # dependencies check
 try:
     if sys.platform == 'win32':
-        subprocess.check_call (['ffmpeg', '-version'])
+        subprocess.check_call(['ffmpeg', '-version'])
     elif sys.platform == 'linux':
-        subprocess.check_call (['ffmpeg', '-version'])
+        subprocess.check_call(['ffmpeg', '-version'])
 except (OSError, IOError):
-    LOG.error ("ffmpeg is not installed.")
-    sys.exit (1)
+    LOG.error("ffmpeg is not installed.")
+    sys.exit(1)
 
 # Check if required environment variables are set
 required_vars = ['APU', 'AP', 'CID', 'CS']
@@ -86,9 +86,10 @@ class RateLimitedClient(Client):
 client = RateLimitedClient()
 client.login(os.environ["APU"], os.environ["AP"])
 
-reddit = praw.Reddit(client_id=os.environ["CID"], client_secret=os.environ["CS"],
-                     user_agent="linux:bluebot:v0.1.6 (by /u/OwO_bots)"
-                     )
+reddit = praw.Reddit(
+    client_id=os.environ["CID"], client_secret=os.environ["CS"],
+    user_agent="linux:bluebot:v0.1.6 (by /u/OwO_bots)"
+    )
 
 
 def ImgPrep(image_data):
@@ -100,16 +101,16 @@ def ImgPrep(image_data):
     # lets check if the image is already in the cache
     cache_path = os.path.join(CACHE_FOLDER, image_hash)
     if os.path.exists(cache_path):
-        if image_data.startswith (b'GIF'):
-            with open (cache_path, 'rb') as f:
-                with open (cache_path + "_size", 'rt') as f_size:
-                    height, width = f_size.read ().split (',')
-                    return f.read (), 'image/gif', int (height), int (width)
+        if image_data.startswith(b'GIF'):
+            with open(cache_path, 'rb') as f:
+                with open(cache_path + "_size", 'rt') as f_size:
+                    height, width = f_size.read().split(',')
+                    return f.read(), 'image/gif', int(height), int(width)
         else:
-            with open (cache_path, 'rb') as f:
-                with open (cache_path + "_size", 'rt') as f_size:
-                    height, width = f_size.read ().split (',')
-                    return f.read (), 'image/jpeg', int (height), int (width)
+            with open(cache_path, 'rb') as f:
+                with open(cache_path + "_size", 'rt') as f_size:
+                    height, width = f_size.read().split(',')
+                    return f.read(), 'image/jpeg', int(height), int(width)
     
     # Open the image data with PIL
     image = Image.open(io.BytesIO(image_data))
@@ -119,7 +120,7 @@ def ImgPrep(image_data):
     with open(cache_path + "_size", 'wt') as f:
         f.write(f"{image.height},{image.width}")
     
-    if image_data.startswith (b'GIF'):
+    if image_data.startswith(b'GIF'):
         return image_data, 'image/gif', image.height, image.width
     else:
         return image_data, 'image/jpeg', image.height, image.width
@@ -137,10 +138,10 @@ def compress_image(image_data, image_url):
         bytes: The binary data of the compressed image.
     """
     # Open the image file
-    if image_url.endswith ('.gif'):
-        image = 'image_cache/' + hashlib.md5 (image_data, usedforsecurity=False).hexdigest () + '.gif'
+    if image_url.endswith('.gif'):
+        image = 'image_cache/' + hashlib.md5(image_data, usedforsecurity=False).hexdigest() + '.gif'
     else:
-        image = Image.open (io.BytesIO (image_data))
+        image = Image.open(io.BytesIO(image_data))
     
     # Compress the image based on its file type
     output = io.BytesIO()
@@ -157,12 +158,12 @@ def compress_image(image_data, image_url):
         # (i wish bsky would support blobs more than 1mb but whatever)
     elif image_url.endswith('.gif'):
         # Convert the GIF to an MP4 using ffmpeg
-        LOG.info ("Converting GIF to MP4")
+        LOG.info("Converting GIF to MP4")
         (
             ffmpeg
-            .input (image)
-            .output (output, format='mp4', vcodec='libx264', pix_fmt='yuv420p')
-            .run (quiet=True, overwrite_output=True)  # overwrite_output=True is needed to avoid a prompt
+            .input(image)
+            .output(output, format='mp4', vcodec='libx264', pix_fmt='yuv420p')
+            .run(quiet=True, overwrite_output=True)  # overwrite_output=True is needed to avoid a prompt
             # when the file already exists (e.g. when testing)
         )
         # probe = ffmpeg.probe(output)
@@ -172,7 +173,7 @@ def compress_image(image_data, image_url):
         image.save(output, format="BMP")  # BMPs are not compressible
     maxsize = 976560
     # Check if the image size is greater than the maximum size
-    if image_url.endswith ('.gif'):
+    if image_url.endswith('.gif'):
         compressed_image_data = output
     else:
         compressed_image_data = output.getvalue()
@@ -201,9 +202,9 @@ def send_post_with_labels(client2, text, labels, embed):
                 text=text,
                 labels=labels,
                 embed=embed
-            ),
+                ),
+            )
         )
-    )
 
 
 def duplicate_check(id):
@@ -271,8 +272,8 @@ def main():
         values=[
             # idk what to do about nude posts on the subreddit so uhhhhh  dm me or smth
             models.ComAtprotoLabelDefs.SelfLabel(val=label),
-        ]
-    )
+            ]
+        )
     try:
         limit = int(parser.get('reddit', 'limit'))
     except config.NoSectionError:
@@ -293,7 +294,7 @@ def main():
         results = []
         new_posts_found = False
         for submission in sub.hot():
-            if len (results) >= limit:  # Stop when we reach the limit
+            if len(results) >= limit:  # Stop when we reach the limit
                 continue
             if 'imgur.com' in submission.url:
                 LOG.info(f"Skipping Imgur post: {submission.url}")
@@ -301,35 +302,36 @@ def main():
                 continue
             post_id = submission.id
             if not submission.stickied and not submission.is_self and submission.url.endswith(
-                    ('.jpg', '.png', '.gif', '.bmp')):
+                    ('.jpg', '.png', '.gif', '.bmp')
+                    ):
                 results.append(submission)
                 LOG.info(f"{submission.title} ({submission.author.name})")
                 image_url = submission.url
                 if not duplicate_check(post_id):
                     # this is separate form the below because we want to convert the gif to a mp4 and then post it
-                    if submission.url.endswith ('.gif'):
-                        image_data = requests.get (image_url, timeout=60).content
+                    if submission.url.endswith('.gif'):
+                        image_data = requests.get(image_url, timeout=60).content
                         # image_size = len(image_data)
-                        cached_image_data, mime_type, height, width = ImgPrep (image_data)
-                        upload = client.upload_blob (image_data)
-                        ratio_as_bsky = models.AppBskyEmbedDefs.AspectRatio (height=height, width=width)
-                        images = models.AppBskyEmbedVideo.Main (alt='', video=upload.blob, aspect_ratio=ratio_as_bsky)
-                        send_post_with_labels (
+                        cached_image_data, mime_type, height, width = ImgPrep(image_data)
+                        upload = client.upload_blob(image_data)
+                        ratio_as_bsky = models.AppBskyEmbedDefs.AspectRatio(height=height, width=width)
+                        images = models.AppBskyEmbedVideo.Main(alt='', video=upload.blob, aspect_ratio=ratio_as_bsky)
+                        send_post_with_labels(
                             client, submission.title + " (u/" + submission.author.name + ")", labels, images
                             )
-                        with open (POSTED_IMAGES_CSV, 'a') as csvfile:
-                            writer = csv.writer (csvfile)
-                            writer.writerow ([post_id])
-                        LOG.info (f"Posted image: {image_url}")
+                        with open(POSTED_IMAGES_CSV, 'a') as csvfile:
+                            writer = csv.writer(csvfile)
+                            writer.writerow([post_id])
+                        LOG.info(f"Posted image: {image_url}")
                         lim_dict = reddit.auth.limits
-                        LOG.info (lim_dict)  # Only update last_post_id if the submission is new
+                        LOG.info(lim_dict)  # Only update last_post_id if the submission is new
                         last_post_id = submission.id
                         
                         # upload = client.send_video(text=submission.title + " (u/" + submission.author.name + ")",
                         # video=image_data, video_alt='',)
                     else:
-                        image_data = requests.get (image_url, timeout=60).content
-                        image_size = len (image_data)
+                        image_data = requests.get(image_url, timeout=60).content
+                        image_size = len(image_data)
                         max_size = 976560
                         if image_size <= max_size:
                             # TODO: add ocr
@@ -338,55 +340,55 @@ def main():
                             #    submission.source,
                             #    image=image_data,
                             #    image_alt='', )
-                            cached_image_data, mime_type, height, width = ImgPrep (image_data)
-                            ratio_as_bsky = models.AppBskyEmbedDefs.AspectRatio (height=height, width=width)
-                            upload = client.upload_blob (cached_image_data)
+                            cached_image_data, mime_type, height, width = ImgPrep(image_data)
+                            ratio_as_bsky = models.AppBskyEmbedDefs.AspectRatio(height=height, width=width)
+                            upload = client.upload_blob(cached_image_data)
                             images = [
-                                models.AppBskyEmbedImages.Image (alt='', image=upload.blob, aspect_ratio=ratio_as_bsky)]
-                            embed = models.AppBskyEmbedImages.Main (images=images)
-                            send_post_with_labels (
+                                models.AppBskyEmbedImages.Image(alt='', image=upload.blob, aspect_ratio=ratio_as_bsky)]
+                            embed = models.AppBskyEmbedImages.Main(images=images)
+                            send_post_with_labels(
                                 client, submission.title + " (u/" + submission.author.name + ")", labels,
                                 embed
                                 )
-                            with open (POSTED_IMAGES_CSV, 'a') as csvfile:
-                                writer = csv.writer (csvfile)
-                                writer.writerow ([post_id])
-                            LOG.info (f"Posted image: {image_url}")
+                            with open(POSTED_IMAGES_CSV, 'a') as csvfile:
+                                writer = csv.writer(csvfile)
+                                writer.writerow([post_id])
+                            LOG.info(f"Posted image: {image_url}")
                             lim_dict = reddit.auth.limits
-                            LOG.info (lim_dict)  # Only update last_post_id if the submission is new
+                            LOG.info(lim_dict)  # Only update last_post_id if the submission is new
                             last_post_id = submission.id
                         else:
-                            LOG.info (f"Resizing image because it's too big: {image_url}")
-                            compressed_image_data = compress_image (image_data, image_url)
-                            compressed_image_size = len (compressed_image_data)
+                            LOG.info(f"Resizing image because it's too big: {image_url}")
+                            compressed_image_data = compress_image(image_data, image_url)
+                            compressed_image_size = len(compressed_image_data)
                             if compressed_image_size > max_size:
-                                LOG.info (f"Skipping image because it's still too big after compression: {image_url}")
-                                with open (POSTED_IMAGES_CSV, 'a') as csvfile:
-                                    writer = csv.writer (csvfile)
-                                    writer.writerow ([post_id])
+                                LOG.info(f"Skipping image because it's still too big after compression: {image_url}")
+                                with open(POSTED_IMAGES_CSV, 'a') as csvfile:
+                                    writer = csv.writer(csvfile)
+                                    writer.writerow([post_id])
                                 continue
                             else:
-                                cached_image_data, mime_type, height, width = ImgPrep (compressed_image_data)
-                                ratio_as_bsky = models.AppBskyEmbedDefs.AspectRatio (height=height, width=width)
-                                upload = client.upload_blob (cached_image_data)
+                                cached_image_data, mime_type, height, width = ImgPrep(compressed_image_data)
+                                ratio_as_bsky = models.AppBskyEmbedDefs.AspectRatio(height=height, width=width)
+                                upload = client.upload_blob(cached_image_data)
                                 images = [
-                                    models.AppBskyEmbedImages.Image (
+                                    models.AppBskyEmbedImages.Image(
                                         alt='', image=upload.blob, aspect_ratio=ratio_as_bsky
                                         )]
-                                embed = models.AppBskyEmbedImages.Main (images=images)
-                                send_post_with_labels (
+                                embed = models.AppBskyEmbedImages.Main(images=images)
+                                send_post_with_labels(
                                     client, submission.title + " (u/" + submission.author.name + ")",
                                     labels,
                                     embed
                                     )
-                                with open (POSTED_IMAGES_CSV, 'a') as csvfile:
-                                    writer = csv.writer (csvfile)
-                                    writer.writerow ([post_id])
-                                LOG.info (f"Posted compressed image: {image_url}")
+                                with open(POSTED_IMAGES_CSV, 'a') as csvfile:
+                                    writer = csv.writer(csvfile)
+                                    writer.writerow([post_id])
+                                LOG.info(f"Posted compressed image: {image_url}")
                                 lim_dict = reddit.auth.limits
-                                LOG.info (lim_dict)
+                                LOG.info(lim_dict)
                                 last_post_id = submission.id
-                                LOG.info (f"Image size: {image_size} bytes")
+                                LOG.info(f"Image size: {image_size} bytes")
                 else:
                     LOG.info(f"Skipping already posted image: {image_url}")
                     continue
