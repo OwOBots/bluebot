@@ -138,7 +138,7 @@ def compress_image(image_data, image_url):
     """
     # Open the image file
     if image_url.endswith ('.gif'):
-        image = 'image_cache/' + hashlib.md5 (image_data).hexdigest () + '.gif'
+        image = 'image_cache/' + hashlib.md5 (image_data, usedforsecurity=False).hexdigest () + '.gif'
     else:
         image = Image.open (io.BytesIO (image_data))
     
@@ -327,9 +327,7 @@ def main():
                         
                         # upload = client.send_video(text=submission.title + " (u/" + submission.author.name + ")",
                         # video=image_data, video_alt='',)
-                    
                     else:
-                        
                         image_data = requests.get (image_url, timeout=60).content
                         image_size = len (image_data)
                         max_size = 976560
