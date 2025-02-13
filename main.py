@@ -317,6 +317,13 @@ def main():
                         send_post_with_labels (
                             client, submission.title + " (u/" + submission.author.name + ")", labels, images
                             )
+                        with open (POSTED_IMAGES_CSV, 'a') as csvfile:
+                            writer = csv.writer (csvfile)
+                            writer.writerow ([post_id])
+                        LOG.info (f"Posted image: {image_url}")
+                        lim_dict = reddit.auth.limits
+                        LOG.info (lim_dict)  # Only update last_post_id if the submission is new
+                        last_post_id = submission.id
                         
                         # upload = client.send_video(text=submission.title + " (u/" + submission.author.name + ")",
                         # video=image_data, video_alt='',)
