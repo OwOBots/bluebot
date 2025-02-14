@@ -20,11 +20,8 @@ import BlueAuth
 import Converter
 import GrabSubPosts
 import SetupLogging
+import globals
 
-# Constants and global variables go here
-POSTED_IMAGES_CSV = 'posted_images.csv'
-CACHE_FOLDER = 'image_cache'
-VERSION = '0.1.10'
 # this is dumb
 LOG = SetupLogging.setup_logger('bluebot', 'bluebot.log')
 
@@ -38,7 +35,7 @@ def check_version():
         response = requests.get("https://raw.githubusercontent.com/OwObots/bluebot/main/version.txt", timeout=10)
         if response.status_code == 200:
             version = response.text.strip()
-            if version != VERSION:
+            if version != globals.VERSION:
                 LOG.warning(f"New version available: {version}")
             else:
                 LOG.info("Running the latest version.")
@@ -159,7 +156,7 @@ def main():
     last_post_id = None
     try:
         sub = GrabSubPosts.get_subreddit(os.environ["CID"], os.environ["CS"])
-        with open(POSTED_IMAGES_CSV, 'r') as csvfile:
+        with open(globals.POSTED_IMAGES_CSV, 'r') as csvfile:
             reader = csv.reader(csvfile)
             posted_images = set(row[0] for row in reader)
         results = []
@@ -190,7 +187,7 @@ def main():
                         send_post_with_labels(
                             client, submission.title + " (u/" + submission.author.name + ")", labels, images
                             )
-                        with open(POSTED_IMAGES_CSV, 'a') as csvfile:
+                        with open(globals.POSTED_IMAGES_CSV, 'a') as csvfile:
                             writer = csv.writer(csvfile)
                             writer.writerow([post_id])
                         LOG.info(f"Posted image: {image_url}")
@@ -205,23 +202,20 @@ def main():
                         image_size = len(image_data)
                         max_size = 976560
                         if image_size <= max_size:
-                            # TODO: add ocr
-                            # client.send_image(
-                            #    text=submission.title + " (u/" + submission.author.name + ")" + "  " +
-                            #    submission.source,
-                            #    image=image_data,
-                            #    image_alt='', )
-                            cached_image_data, mime_type, height, width = Converter.ImgPrep(image_data)
+                            cached_image_data, mime_type, height, width, ocr = Converter.ImgPrep(image_data)
                             ratio_as_bsky = models.AppBskyEmbedDefs.AspectRatio(height=height, width=width)
                             upload = client.upload_blob(cached_image_data)
+                            LOG.info(f"OCR: {ocr}")
                             images = [
-                                models.AppBskyEmbedImages.Image(alt='', image=upload.blob, aspect_ratio=ratio_as_bsky)]
+                                models.AppBskyEmbedImages.Image(
+                                    alt=f'{ocr}', image=upload.blob, aspect_ratio=ratio_as_bsky
+                                    )]
                             embed = models.AppBskyEmbedImages.Main(images=images)
                             send_post_with_labels(
                                 client, submission.title + " (u/" + submission.author.name + ")", labels,
                                 embed
                                 )
-                            with open(POSTED_IMAGES_CSV, 'a') as csvfile:
+                            with open(globals.POSTED_IMAGES_CSV, 'a') as csvfile:
                                 writer = csv.writer(csvfile)
                                 writer.writerow([post_id])
                             LOG.info(f"Posted image: {image_url}")
@@ -234,7 +228,7 @@ def main():
                             compressed_image_size = len(compressed_image_data)
                             if compressed_image_size > max_size:
                                 LOG.info(f"Skipping image because it's still too big after compression: {image_url}")
-                                with open(POSTED_IMAGES_CSV, 'a') as csvfile:
+                                with open(globals.POSTED_IMAGES_CSV, 'a') as csvfile:
                                     writer = csv.writer(csvfile)
                                     writer.writerow([post_id])
                                 continue
@@ -252,7 +246,7 @@ def main():
                                     labels,
                                     embed
                                     )
-                                with open(POSTED_IMAGES_CSV, 'a') as csvfile:
+                                with open(globals.POSTED_IMAGES_CSV, 'a') as csvfile:
                                     writer = csv.writer(csvfile)
                                     writer.writerow([post_id])
                                 LOG.info(f"Posted compressed image: {image_url}")

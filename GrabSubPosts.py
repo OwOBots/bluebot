@@ -4,11 +4,10 @@ import sys
 import praw
 
 import SetupLogging
-from main import VERSION
+import globals
 
 parser = config.ConfigParser()
 parser.read('config.ini')
-
 
 LOG = SetupLogging.setup_logger('grabsubposts', 'grabsubposts.log')
 
@@ -22,7 +21,7 @@ def Login(CID, CS):
     """
     reddit = praw.Reddit(
         client_id=CID, client_secret=CS,
-        user_agent=f"linux:bluebot:v{VERSION} (by /u/OwO_bots)"
+        user_agent=f"linux:bluebot:v{globals.VERSION} (by /u/OwO_bots)"
         )
     return reddit
 

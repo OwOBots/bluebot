@@ -3,10 +3,11 @@ import io
 import os
 
 import ffmpeg
+import pytesseract
 from PIL import Image
 
 import SetupLogging
-from main import CACHE_FOLDER
+import globals
 
 LOG = SetupLogging.setup_logger('converter', 'converter.log')
 
@@ -18,13 +19,13 @@ def ImgPrep(image_data):
     :param image_data:
     :return:
     """
-    if not os.path.exists(CACHE_FOLDER):
-        os.makedirs(CACHE_FOLDER)
+    if not os.path.exists(globals.CACHE_FOLDER):
+        os.makedirs(globals.CACHE_FOLDER)
     
     image_hash = hashlib.md5(image_data, usedforsecurity=False).hexdigest()
     
     # let's check if the image is already in the cache
-    cache_path = os.path.join(CACHE_FOLDER, image_hash)
+    cache_path = os.path.join(globals.CACHE_FOLDER, image_hash)
     if os.path.exists(cache_path):
         if image_data.startswith(b"GIF"):
             with open(cache_path, "rb") as f:
@@ -46,9 +47,15 @@ def ImgPrep(image_data):
         f.write(f"{image.height},{image.width}")
     
     if image_data.startswith(b"GIF"):
+        pass
+    else:
+        ocr = pytesseract.image_to_string(image)
+    
+    if image_data.startswith(b"GIF"):
         return image_data, "image/gif", image.height, image.width
     else:
-        return image_data, "image/jpeg", image.height, image.width
+        # noinspection PyUnboundLocalVariable
+        return image_data, "image/jpeg", image.height, image.width, ocr
 
 
 def compress_image(image_data, image_url):
