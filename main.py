@@ -2,9 +2,6 @@
 # -*- coding: utf-8 -*-
 import configparser as config
 import csv
-import hashlib
-import io
-import logging
 import math
 import os
 import subprocess
@@ -13,30 +10,21 @@ import time
 
 import atproto.exceptions
 import dotenv
-import ffmpeg
 import praw
 import prawcore
 import requests
-from PIL import Image
 from atproto import models
-from atproto_client import Client
 from atproto_client.models import ids
+
+import BlueAuth
+import Converter
+import SetupLogging
 
 # Constants and global variables go here
 POSTED_IMAGES_CSV = 'posted_images.csv'
 CACHE_FOLDER = 'image_cache'
 # this is dumb
-LOG = logging.getLogger('bluebot')
-LOG.setLevel(logging.DEBUG)
-file_handler = logging.FileHandler('bluebot.log')
-file_handler.setLevel(logging.DEBUG)
-console_handler = logging.StreamHandler()
-console_handler.setLevel(logging.DEBUG)
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-file_handler.setFormatter(formatter)
-console_handler.setFormatter(formatter)
-LOG.addHandler(file_handler)
-LOG.addHandler(console_handler)
+LOG = SetupLogging.setup_logger('bluebot', 'bluebot.log')
 
 parser = config.ConfigParser()
 parser.read('config.ini')
@@ -46,7 +34,7 @@ dotenv.load_dotenv()
 # dependencies check
 try:
     if sys.platform == 'win32':
-        subprocess.check_call(['ffmpeg', '-version'])
+        subprocess.check_call(['ffmpeg.exe', '-version'])
     elif sys.platform == 'linux':
         subprocess.check_call(['ffmpeg', '-version'])
 except (OSError, IOError):
@@ -60,124 +48,13 @@ for var in required_vars:
         LOG.critical(f"Error: {var} environment variable is not set")
         sys.exit(1)
 
-
-# stolen from https://github.com/MarshalX/atproto/discussions/167#discussioncomment-8579573
-class RateLimitedClient(Client):
-    def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
-        
-        self._limit = self._remaining = self._reset = None
-    
-    def get_rate_limit(self):
-        return self._limit, self._remaining, self._reset
-    
-    def _invoke(self, *args, **kwargs):
-        response = super()._invoke(*args, **kwargs)
-        
-        self._limit = response.headers.get('ratelimit-limit')
-        self._remaining = response.headers.get('ratelimit-remaining')
-        self._reset = response.headers.get('ratelimit-reset')
-        
-        return response
-
-
 # client = atproto.Client()
-
-client = RateLimitedClient()
-client.login(os.environ["APU"], os.environ["AP"])
+client = BlueAuth.Login(os.environ["APU"], os.environ["AP"])
 
 reddit = praw.Reddit(
     client_id=os.environ["CID"], client_secret=os.environ["CS"],
-    user_agent="linux:bluebot:v0.1.6 (by /u/OwO_bots)"
+    user_agent="linux:bluebot:v0.1.10 (by /u/OwO_bots)"
     )
-
-
-def ImgPrep(image_data):
-    if not os.path.exists(CACHE_FOLDER):
-        os.makedirs(CACHE_FOLDER)
-    
-    image_hash = hashlib.md5(image_data, usedforsecurity=False).hexdigest()
-    
-    # lets check if the image is already in the cache
-    cache_path = os.path.join(CACHE_FOLDER, image_hash)
-    if os.path.exists(cache_path):
-        if image_data.startswith(b'GIF'):
-            with open(cache_path, 'rb') as f:
-                with open(cache_path + "_size", 'rt') as f_size:
-                    height, width = f_size.read().split(',')
-                    return f.read(), 'image/gif', int(height), int(width)
-        else:
-            with open(cache_path, 'rb') as f:
-                with open(cache_path + "_size", 'rt') as f_size:
-                    height, width = f_size.read().split(',')
-                    return f.read(), 'image/jpeg', int(height), int(width)
-    
-    # Open the image data with PIL
-    image = Image.open(io.BytesIO(image_data))
-    
-    with open(cache_path, 'wb') as f:
-        f.write(image_data)
-    with open(cache_path + "_size", 'wt') as f:
-        f.write(f"{image.height},{image.width}")
-    
-    if image_data.startswith(b'GIF'):
-        return image_data, 'image/gif', image.height, image.width
-    else:
-        return image_data, 'image/jpeg', image.height, image.width
-
-
-def compress_image(image_data, image_url):
-    """
-    Compresses an image based on its file type and returns the compressed image data.
-
-    Args:
-        image_data (bytes): The binary data of the image to be compressed.
-        image_url (str): The URL of the image, used to determine the file type.
-
-    Returns:
-        bytes: The binary data of the compressed image.
-    """
-    # Open the image file
-    if image_url.endswith('.gif'):
-        image = 'image_cache/' + hashlib.md5(image_data, usedforsecurity=False).hexdigest() + '.gif'
-    else:
-        image = Image.open(io.BytesIO(image_data))
-    
-    # Compress the image based on its file type
-    output = io.BytesIO()
-    if image_url.endswith('.jpg') or image_url.endswith('.jpeg'):
-        image.save(output, format="JPEG", quality=80)  # Adjust the quality as needed
-    elif image_url.endswith('.png'):
-        width, height = image.size
-        len(image_data)
-        LOG.info("Image size before compression: {}x{} ({} bytes)".format(width, height, len(image_data)))
-        new_size = (width // 2, height // 2)
-        # should fix cannot write mode RGBA as JPEG at the cost of bluesky not supporting files over 1mb in size (grr)
-        image.resize(new_size, Image.Resampling.LANCZOS)
-        image.save(output, format="PNG", optimize=True, quality=20)
-        # (i wish bsky would support blobs more than 1mb but whatever)
-    elif image_url.endswith('.gif'):
-        # Convert the GIF to an MP4 using ffmpeg
-        LOG.info("Converting GIF to MP4")
-        (
-            ffmpeg
-            .input(image)
-            .output(output, format='mp4', vcodec='libx264', pix_fmt='yuv420p')
-            .run(quiet=True, overwrite_output=True)  # overwrite_output=True is needed to avoid a prompt
-            # when the file already exists (e.g. when testing)
-        )
-        # probe = ffmpeg.probe(output)
-        # width = probe['streams'][0]['width']
-        # height = probe['streams'][0]['height']
-    elif image_url.endswith('.bmp'):
-        image.save(output, format="BMP")  # BMPs are not compressible
-    maxsize = 976560
-    # Check if the image size is greater than the maximum size
-    if image_url.endswith('.gif'):
-        compressed_image_data = output
-    else:
-        compressed_image_data = output.getvalue()
-    return compressed_image_data
 
 
 def send_post_with_labels(client2, text, labels, embed):
@@ -207,12 +84,12 @@ def send_post_with_labels(client2, text, labels, embed):
         )
 
 
-def duplicate_check(id):
+def duplicate_check(post_id):
     value = False
     with open('posted_images.csv', 'rt', newline='') as f:
         reader = csv.reader(f, delimiter=',')
         for row in reader:
-            if id in row:
+            if post_id in row:
                 value = True
     f.close()
     return value
@@ -263,6 +140,8 @@ def get_subreddit():
         sys.exit(1)
 
 
+# TODO: Refactor this function
+
 def main():
     LOG.info("Starting...")
     
@@ -270,7 +149,7 @@ def main():
     label = parser.get('bsky', 'label')
     labels = models.ComAtprotoLabelDefs.SelfLabels(
         values=[
-            # idk what to do about nude posts on the subreddit so uhhhhh  dm me or smth
+            # IDK what to do about nude posts on the subreddit so dm me or smth
             models.ComAtprotoLabelDefs.SelfLabel(val=label),
             ]
         )
@@ -312,7 +191,7 @@ def main():
                     if submission.url.endswith('.gif'):
                         image_data = requests.get(image_url, timeout=60).content
                         # image_size = len(image_data)
-                        cached_image_data, mime_type, height, width = ImgPrep(image_data)
+                        cached_image_data, mime_type, height, width = Converter.ImgPrep(image_data)
                         upload = client.upload_blob(image_data)
                         ratio_as_bsky = models.AppBskyEmbedDefs.AspectRatio(height=height, width=width)
                         images = models.AppBskyEmbedVideo.Main(alt='', video=upload.blob, aspect_ratio=ratio_as_bsky)
@@ -340,7 +219,7 @@ def main():
                             #    submission.source,
                             #    image=image_data,
                             #    image_alt='', )
-                            cached_image_data, mime_type, height, width = ImgPrep(image_data)
+                            cached_image_data, mime_type, height, width = Converter.ImgPrep(image_data)
                             ratio_as_bsky = models.AppBskyEmbedDefs.AspectRatio(height=height, width=width)
                             upload = client.upload_blob(cached_image_data)
                             images = [
@@ -359,7 +238,7 @@ def main():
                             last_post_id = submission.id
                         else:
                             LOG.info(f"Resizing image because it's too big: {image_url}")
-                            compressed_image_data = compress_image(image_data, image_url)
+                            compressed_image_data = Converter.compress_image(image_data, image_url)
                             compressed_image_size = len(compressed_image_data)
                             if compressed_image_size > max_size:
                                 LOG.info(f"Skipping image because it's still too big after compression: {image_url}")
@@ -368,7 +247,7 @@ def main():
                                     writer.writerow([post_id])
                                 continue
                             else:
-                                cached_image_data, mime_type, height, width = ImgPrep(compressed_image_data)
+                                cached_image_data, mime_type, height, width = Converter.ImgPrep(compressed_image_data)
                                 ratio_as_bsky = models.AppBskyEmbedDefs.AspectRatio(height=height, width=width)
                                 upload = client.upload_blob(cached_image_data)
                                 images = [
