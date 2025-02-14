@@ -32,7 +32,9 @@ parser.read('config.ini')
 # Check version from github and compare to current version
 def check_version():
     try:
-        response = requests.get("https://raw.githubusercontent.com/OwObots/bluebot/main/version.txt", timeout=10)
+        response = requests.get(
+            "https://raw.githubusercontent.com/OwOBots/bluebot/refs/heads/Refactoring/globals.py", timeout=10
+            )
         if response.status_code == 200:
             version = response.text.strip()
             if version != globals.VERSION:
@@ -127,7 +129,6 @@ def notify_sleep(sleeptime, interval=5 * 60, reason=""):
             loop2 = True
         timeleft -= zzzz
         time.sleep(zzzz)
-
 
 
 def main():
