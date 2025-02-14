@@ -22,6 +22,7 @@ import GrabSubPosts
 import SetupLogging
 import globals
 
+VERSION = '0.1.10'
 # this is dumb
 LOG = SetupLogging.setup_logger('bluebot', 'bluebot.log')
 
@@ -35,11 +36,11 @@ def check_version():
         # Refactoring branch is temporary
         # TODO: Change this to the main branch BEFORE merging
         response = requests.get(
-            "https://raw.githubusercontent.com/OwOBots/bluebot/refs/heads/Refactoring/globals.py", timeout=10
+            "https://raw.githubusercontent.com/OwOBots/bluebot/refs/heads/Refactoring/version.txt", timeout=10
             )
         if response.status_code == 200:
             version = response.text.strip()
-            if version != globals.VERSION:
+            if version != VERSION:
                 LOG.warning(f"New version available: {version}")
             else:
                 LOG.info("Running the latest version.")
