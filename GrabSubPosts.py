@@ -4,6 +4,7 @@ import sys
 import praw
 
 import SetupLogging
+from main import VERSION
 
 parser = config.ConfigParser()
 parser.read('config.ini')
@@ -21,7 +22,7 @@ def Login(CID, CS):
     """
     reddit = praw.Reddit(
         client_id=CID, client_secret=CS,
-        user_agent="linux:bluebot:v0.1.10 (by /u/OwO_bots)"
+        user_agent=f"linux:bluebot:v{VERSION} (by /u/OwO_bots)"
         )
     return reddit
 

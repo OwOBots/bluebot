@@ -24,6 +24,7 @@ import SetupLogging
 # Constants and global variables go here
 POSTED_IMAGES_CSV = 'posted_images.csv'
 CACHE_FOLDER = 'image_cache'
+VERSION = '0.1.10'
 # this is dumb
 LOG = SetupLogging.setup_logger('bluebot', 'bluebot.log')
 
@@ -34,10 +35,10 @@ parser.read('config.ini')
 # Check version from github and compare to current version
 def check_version():
     try:
-        response = requests.get("https://raw.githubusercontent.com/OwObots/bluebot/main/version.txt")
+        response = requests.get("https://raw.githubusercontent.com/OwObots/bluebot/main/version.txt", timeout=10)
         if response.status_code == 200:
             version = response.text.strip()
-            if version != "0.1.10":
+            if version != VERSION:
                 LOG.warning(f"New version available: {version}")
             else:
                 LOG.info("Running the latest version.")
@@ -131,7 +132,6 @@ def notify_sleep(sleeptime, interval=5 * 60, reason=""):
         time.sleep(zzzz)
 
 
-# TODO: Refactor this function
 
 def main():
     LOG.info("Starting...")
