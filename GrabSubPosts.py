@@ -1,7 +1,6 @@
 import configparser as config
 import sys
 
-import dotenv
 import praw
 
 import SetupLogging
@@ -9,7 +8,6 @@ import SetupLogging
 parser = config.ConfigParser()
 parser.read('config.ini')
 
-dotenv.load_dotenv()
 
 LOG = SetupLogging.setup_logger('grabsubposts', 'grabsubposts.log')
 
