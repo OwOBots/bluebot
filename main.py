@@ -10,14 +10,15 @@ import time
 
 import atproto.exceptions
 import dotenv
-import praw
 import prawcore
 import requests
 from atproto import models
 from atproto_client.models import ids
 
+# custom imports
 import BlueAuth
 import Converter
+import GrabSubPosts
 import SetupLogging
 
 # Constants and global variables go here
@@ -28,6 +29,23 @@ LOG = SetupLogging.setup_logger('bluebot', 'bluebot.log')
 
 parser = config.ConfigParser()
 parser.read('config.ini')
+
+
+# Check version from github and compare to current version
+def check_version():
+    try:
+        response = requests.get("https://raw.githubusercontent.com/OwObots/bluebot/main/version.txt")
+        if response.status_code == 200:
+            version = response.text.strip()
+            if version != "0.1.10":
+                LOG.warning(f"New version available: {version}")
+            else:
+                LOG.info("Running the latest version.")
+        else:
+            LOG.error("Failed to check for updates.")
+    except requests.exceptions.RequestException as e:
+        LOG.error(f"Failed to check for updates: {e}")
+
 
 dotenv.load_dotenv()
 
@@ -50,11 +68,6 @@ for var in required_vars:
 
 # client = atproto.Client()
 client = BlueAuth.Login(os.environ["APU"], os.environ["AP"])
-
-reddit = praw.Reddit(
-    client_id=os.environ["CID"], client_secret=os.environ["CS"],
-    user_agent="linux:bluebot:v0.1.10 (by /u/OwO_bots)"
-    )
 
 
 def send_post_with_labels(client2, text, labels, embed):
@@ -118,32 +131,11 @@ def notify_sleep(sleeptime, interval=5 * 60, reason=""):
         time.sleep(zzzz)
 
 
-def get_subreddit():
-    """
-    Retrieves the subreddit specified in the configuration file.
-
-    Returns:
-        praw.models.Subreddit: The subreddit object for the specified subreddit.
-
-    Raises:
-        SystemExit: If the 'reddit' section or 'subreddit' key is not found in the config file.
-    """
-    try:
-        sub = parser.get('reddit', 'subreddit')
-        LOG.info(f"Trying to access subreddit: {sub}")
-        return reddit.subreddit(sub)
-    except config.NoSectionError:
-        LOG.error("Error: 'reddit' section not found in config file")
-        sys.exit(1)
-    except config.NoOptionError:
-        LOG.error("Error: 'subreddit' key not found in 'reddit' section of config file")
-        sys.exit(1)
-
-
 # TODO: Refactor this function
 
 def main():
     LOG.info("Starting...")
+    reddit = GrabSubPosts.Login(os.environ["CID"], os.environ["CS"])
     
     # this should of been here first lmao
     label = parser.get('bsky', 'label')
@@ -166,7 +158,7 @@ def main():
         sys.exit(1)
     last_post_id = None
     try:
-        sub = get_subreddit()
+        sub = GrabSubPosts.get_subreddit(os.environ["CID"], os.environ["CS"])
         with open(POSTED_IMAGES_CSV, 'r') as csvfile:
             reader = csv.reader(csvfile)
             posted_images = set(row[0] for row in reader)
@@ -279,6 +271,7 @@ def main():
 if __name__ == "__main__":
     while True:
         try:
+            check_version()
             main()
             notify_sleep(sleeptime=36000, reason=" (no new posts)")
         except Exception as at:
