@@ -32,6 +32,8 @@ parser.read('config.ini')
 # Check version from github and compare to current version
 def check_version():
     try:
+        # Refactoring branch is temporary
+        # TODO: Change this to the main branch BEFORE merging
         response = requests.get(
             "https://raw.githubusercontent.com/OwOBots/bluebot/refs/heads/Refactoring/globals.py", timeout=10
             )
