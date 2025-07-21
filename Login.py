@@ -52,6 +52,7 @@ class RateLimitedClient(Client):
 def blue_login():
     client = RateLimitedClient()
     client.login(os.environ["APU"], os.environ["AP"])
+    return client
 
 
 def reddit():
