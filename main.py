@@ -7,20 +7,19 @@ import io
 import logging
 import math
 import os
-import subprocess
 import sys
 import time
 
-import atproto.exceptions
 import dotenv
 import ffmpeg
-import praw
 import prawcore
 import requests
 from PIL import Image
 from atproto import models
-from atproto_client import Client
 from atproto_client.models import ids
+
+import depcheck
+from Login import ReqVars, blue_login, reddit
 
 # Constants and global variables go here
 POSTED_IMAGES_CSV = 'posted_images.csv'
@@ -43,62 +42,23 @@ parser.read('config.ini')
 
 dotenv.load_dotenv()
 
-# dependencies check
-try:
-    if sys.platform == 'win32':
-        subprocess.check_call(['ffmpeg', '-version'])
-    elif sys.platform == 'linux':
-        subprocess.check_call(['ffmpeg', '-version'])
-except (OSError, IOError):
-    LOG.error("ffmpeg is not installed.")
-    sys.exit(1)
+depcheck.check()
 
 # Check if required environment variables are set
-required_vars = ['APU', 'AP', 'CID', 'CS']
-for var in required_vars:
-    if var not in os.environ:
-        LOG.critical(f"Error: {var} environment variable is not set")
-        sys.exit(1)
+ReqVars()
 
-
-# stolen from https://github.com/MarshalX/atproto/discussions/167#discussioncomment-8579573
-class RateLimitedClient(Client):
-    def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
-        
-        self._limit = self._remaining = self._reset = None
-    
-    def get_rate_limit(self):
-        return self._limit, self._remaining, self._reset
-    
-    def _invoke(self, *args, **kwargs):
-        response = super()._invoke(*args, **kwargs)
-        
-        self._limit = response.headers.get('ratelimit-limit')
-        self._remaining = response.headers.get('ratelimit-remaining')
-        self._reset = response.headers.get('ratelimit-reset')
-        
-        return response
-
-
-# client = atproto.Client()
-
-client = RateLimitedClient()
-client.login(os.environ["APU"], os.environ["AP"])
-
-reddit = praw.Reddit(
-    client_id=os.environ["CID"], client_secret=os.environ["CS"],
-    user_agent="linux:bluebot:v0.1.6 (by /u/OwO_bots)"
-    )
+# Login
+client = blue_login()
+reddit = reddit()
 
 
 def ImgPrep(image_data):
     if not os.path.exists(CACHE_FOLDER):
         os.makedirs(CACHE_FOLDER)
-    
+
     image_hash = hashlib.md5(image_data, usedforsecurity=False).hexdigest()
-    
-    # lets check if the image is already in the cache
+
+    # let's check if the image is already in the cache
     cache_path = os.path.join(CACHE_FOLDER, image_hash)
     if os.path.exists(cache_path):
         if image_data.startswith(b'GIF'):
@@ -111,15 +71,15 @@ def ImgPrep(image_data):
                 with open(cache_path + "_size", 'rt') as f_size:
                     height, width = f_size.read().split(',')
                     return f.read(), 'image/jpeg', int(height), int(width)
-    
+
     # Open the image data with PIL
     image = Image.open(io.BytesIO(image_data))
-    
+
     with open(cache_path, 'wb') as f:
         f.write(image_data)
     with open(cache_path + "_size", 'wt') as f:
         f.write(f"{image.height},{image.width}")
-    
+
     if image_data.startswith(b'GIF'):
         return image_data, 'image/gif', image.height, image.width
     else:
@@ -263,17 +223,18 @@ def get_subreddit():
         sys.exit(1)
 
 
+# TODO: what the fuck was i thinking. Refactor this shit
 def main():
     LOG.info("Starting...")
-    
-    # this should of been here first lmao
+
+    # this should have been here first lmao
     label = parser.get('bsky', 'label')
     labels = models.ComAtprotoLabelDefs.SelfLabels(
         values=[
-            # idk what to do about nude posts on the subreddit so uhhhhh  dm me or smth
+            # IDK what to do about nude posts on the subreddit so uhhhhh  dm me or smth
             models.ComAtprotoLabelDefs.SelfLabel(val=label),
-            ]
-        )
+        ]
+    )
     try:
         limit = int(parser.get('reddit', 'limit'))
     except config.NoSectionError:
@@ -326,7 +287,7 @@ def main():
                         lim_dict = reddit.auth.limits
                         LOG.info(lim_dict)  # Only update last_post_id if the submission is new
                         last_post_id = submission.id
-                        
+
                         # upload = client.send_video(text=submission.title + " (u/" + submission.author.name + ")",
                         # video=image_data, video_alt='',)
                     else:
@@ -392,7 +353,7 @@ def main():
                 else:
                     LOG.info(f"Skipping already posted image: {image_url}")
                     continue
-    
+
     except prawcore.exceptions.NotFound:
         LOG.error("Error: Subreddit not found. Please check the subreddit name in your config file.")
 

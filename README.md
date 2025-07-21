@@ -5,29 +5,24 @@ Tootbot but for bluesky
 ****
 # DISCLAIMER
 
-Very basic. No guarantees. Use at your own risk. Follow TOS and Privacy Policy.
+Very basic. No guarantees. Use at your own risk. No support will be provided. This is a hobby project and not intended
+for production use.
 
 ***
 
 # Installation
 
-If on windows, install ffmpeg and add it to your path or use winget. if you are on linux you know what to do.
+- Windows: [FFmpeg for Windows](https://www.gyan.dev/ffmpeg/builds/)
+- macOS: `brew install ffmpeg`
+- Linux: Use your distro’s package manager (e.g. `sudo apt install ffmpeg`)
 
     git clone https://github.com/OwOBots/bluebot
-    pip install -r requirements.txt
     Set up the .env file
-    python main.py
+    uv run main.py
 
 ***
-### Note: This was only tested on python 3.12
 
 
-***
-*But TDPNG i use an arch based distro i cant install shit with pip*  [**USE VENV
-**](https://docs.python.org/3/library/venv.html)
-
-
- ****
 
 # Setting up .env
 
@@ -47,7 +42,7 @@ If on windows, install ffmpeg and add it to your path or use winget. if you are 
 
 ***
 ``` bash
-    python3.12 main.py
+    uv run main.py
 ```
 
 ****
