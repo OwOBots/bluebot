@@ -8,10 +8,10 @@ dependencies = [
     "black>=25.1.0",
     "certifi==2025.7.14",
     "ffmpeg-python==0.2.0",
-    "pillow==12.1.1",
+    "pillow==12.2.0",
     "praw",
     "pytesseract>=0.3.13",
-    "python-dotenv==1.1.1",
+    "python-dotenv==1.2.2",
     "requests==2.33.0",
 ]
 
